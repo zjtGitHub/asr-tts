@@ -1,2 +1,5 @@
 node_modules/
 vendor/
+english-listening-trainer/.venv/
+english-listening-trainer/src-tauri/target/
+.DS_Store
