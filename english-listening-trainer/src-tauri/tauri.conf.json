@@ -5,6 +5,7 @@
   "identifier": "com.zjt.english-listening-trainer",
   "build": {
     "beforeDevCommand": {
+      "cwd": "..",
       "script": "python3 scripts/dev_backend.py",
       "wait": false
     },
