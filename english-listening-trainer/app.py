@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import re
 import tempfile
 from pathlib import Path
 from typing import Any
@@ -26,6 +27,7 @@ app.add_middleware(
 )
 
 _model: WhisperModel | None = None
+SENTENCE_END_RE = re.compile(r"[.!?][\"')\]]*$")
 
 
 def get_model() -> WhisperModel:
@@ -37,6 +39,63 @@ def get_model() -> WhisperModel:
             compute_type=COMPUTE_TYPE,
         )
     return _model
+
+
+def build_sentence_rows(segments) -> list[dict[str, Any]]:
+    rows: list[dict[str, Any]] = []
+    current_words: list[dict[str, Any]] = []
+
+    def flush() -> None:
+        nonlocal current_words
+        if not current_words:
+            return
+
+        text = " ".join(item["word"] for item in current_words)
+        text = re.sub(r"\s+([,.;:!?])", r"\1", text).strip()
+        rows.append(
+            {
+                "start": current_words[0]["start"],
+                "end": current_words[-1]["end"],
+                "text": text,
+                "words": current_words,
+            }
+        )
+        current_words = []
+
+    for segment in segments:
+        words = list(segment.words or [])
+
+        if not words:
+            text = segment.text.strip()
+            if text:
+                flush()
+                rows.append(
+                    {
+                        "start": round(float(segment.start), 3),
+                        "end": round(float(segment.end), 3),
+                        "text": text,
+                        "words": [],
+                    }
+                )
+            continue
+
+        for word in words:
+            token = word.word.strip()
+            if not token:
+                continue
+
+            item = {
+                "start": round(float(word.start if word.start is not None else segment.start), 3),
+                "end": round(float(word.end if word.end is not None else segment.end), 3),
+                "word": token,
+            }
+            current_words.append(item)
+
+            if SENTENCE_END_RE.search(token):
+                flush()
+
+    flush()
+    return rows
 
 
 @app.get("/")
@@ -72,27 +131,7 @@ async def transcribe(file: UploadFile = File(...)) -> dict[str, Any]:
             condition_on_previous_text=True,
         )
 
-        rows = []
-        for segment in segments:
-            text = segment.text.strip()
-            if not text:
-                continue
-            rows.append(
-                {
-                    "start": round(float(segment.start), 3),
-                    "end": round(float(segment.end), 3),
-                    "text": text,
-                    "words": [
-                        {
-                            "start": round(float(word.start or segment.start), 3),
-                            "end": round(float(word.end or segment.end), 3),
-                            "word": word.word.strip(),
-                        }
-                        for word in (segment.words or [])
-                        if word.word.strip()
-                    ],
-                }
-            )
+        rows = build_sentence_rows(segments)
 
         return {
             "filename": filename,
