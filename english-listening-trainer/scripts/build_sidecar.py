@@ -25,6 +25,7 @@ COLLECT_ALL_CANDIDATES = [
     "onnxruntime",
     "certifi",
     "multipart",
+    "uvicorn",
 ]
 
 COPY_METADATA_CANDIDATES = [
@@ -34,6 +35,7 @@ COPY_METADATA_CANDIDATES = [
     "huggingface-hub",
     "onnxruntime",
     "certifi",
+    "uvicorn",
 ]
 
 
