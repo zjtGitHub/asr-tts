@@ -20,14 +20,11 @@
     button.secondary { background: #eef2f7; color: #253044; }
     button.secondary.active { background: #dce8ff; color: #174ea6; }
     button:disabled { opacity: .45; cursor: not-allowed; }
-
-    /* Keep the player available, but make the transcript its own scroll area so rows do not disappear underneath it. */
     .player-wrap { padding: 18px 22px; position: sticky; top: 12px; z-index: 10; margin-bottom: 16px; background: rgba(255, 255, 255, .98); backdrop-filter: blur(10px); }
     audio { width: 100%; display: block; }
     .player-toolbar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-top: 10px; }
     .player-toolbar button { padding: 8px 12px; font-size: 13px; }
     .meta { margin-left: auto; color: #737d8c; font-size: 13px; min-width: 180px; text-align: right; }
-
     .transcript { overflow-y: auto; max-height: calc(100vh - 190px); min-height: 260px; overscroll-behavior: contain; scroll-behavior: smooth; position: relative; }
     .empty { padding: 42px 28px; text-align: center; color: #7c8797; }
     .segment { display: grid; grid-template-columns: 86px 1fr; gap: 12px; padding: 17px 22px; border-top: 1px solid #eef1f5; cursor: pointer; transition: background .15s ease, box-shadow .15s ease; scroll-margin-block: 120px; }
@@ -41,7 +38,6 @@
     .transcript.subtitles-hidden .hidden-hint { display: block; }
     .status { margin-top: 12px; min-height: 22px; color: #5e6978; }
     .error { color: #b42318; }
-
     @media (max-width: 640px) {
       .page { padding-left: 10px; padding-right: 10px; }
       .segment { grid-template-columns: 1fr; }
@@ -94,6 +90,11 @@
     const followBtn = document.getElementById('followBtn');
     const subtitleBtn = document.getElementById('subtitleBtn');
 
+    const API_BASE =
+      window.location.hostname === '127.0.0.1' && window.location.port === '8000'
+        ? ''
+        : 'http://127.0.0.1:8000';
+
     let currentFileUrl = null;
     let segments = [];
     let activeIndex = -1;
@@ -121,13 +122,9 @@
     function findCurrentSegmentIndex() {
       if (!segments.length) return -1;
       const current = audio.currentTime;
-
-      // Prefer a segment that actually contains the current playback time.
       for (let i = 0; i < segments.length; i += 1) {
         if (current >= segments[i].start && current < segments[i].end) return i;
       }
-
-      // During a short silence, keep the most recently spoken sentence selected.
       let previous = -1;
       for (let i = 0; i < segments.length; i += 1) {
         if (segments[i].start <= current) previous = i;
@@ -139,7 +136,6 @@
     function scrollSegmentIntoView(index, behavior = 'smooth') {
       const row = segmentsEl.querySelector(`.segment[data-index="${index}"]`);
       if (!row) return;
-
       const containerRect = transcriptCard.getBoundingClientRect();
       const rowRect = row.getBoundingClientRect();
       const relativeTop = rowRect.top - containerRect.top + transcriptCard.scrollTop;
@@ -160,7 +156,6 @@
       segmentsEl.innerHTML = '';
       emptyEl.hidden = segments.length > 0;
       activeIndex = -1;
-
       segments.forEach((segment, index) => {
         const row = document.createElement('div');
         row.className = 'segment';
@@ -177,7 +172,6 @@
         });
         segmentsEl.appendChild(row);
       });
-
       setControlsEnabled(segments.length > 0);
     }
 
@@ -230,7 +224,6 @@
       updateSubtitleButton();
       setStatus('');
       transcriptCard.scrollTop = 0;
-
       if (currentFileUrl) URL.revokeObjectURL(currentFileUrl);
       if (file) {
         currentFileUrl = URL.createObjectURL(file);
@@ -245,18 +238,15 @@
     transcribeBtn.addEventListener('click', async () => {
       const file = fileInput.files?.[0];
       if (!file) return;
-
       const formData = new FormData();
       formData.append('file', file);
       transcribeBtn.disabled = true;
       setControlsEnabled(false);
       setStatus('Transcribing… the first run may download the Whisper model.');
-
       try {
-        const response = await fetch('/api/transcribe', { method: 'POST', body: formData });
+        const response = await fetch(`${API_BASE}/api/transcribe`, { method: 'POST', body: formData });
         const payload = await response.json();
         if (!response.ok) throw new Error(payload.detail || 'Transcription failed');
-
         segments = payload.segments || [];
         renderSegments();
         metaEl.textContent = `${payload.filename} · ${formatTime(payload.duration)} · ${payload.language.toUpperCase()} ${(payload.language_probability * 100).toFixed(1)}%`;
@@ -273,7 +263,6 @@
     audio.addEventListener('seeking', updateActiveSegment);
     audio.addEventListener('play', updateActiveSegment);
 
-    // Handy keyboard controls while doing intensive listening.
     document.addEventListener('keydown', (event) => {
       if (event.target instanceof HTMLInputElement || event.target instanceof HTMLTextAreaElement) return;
       if (event.key.toLowerCase() === 'l' && segments.length) {
