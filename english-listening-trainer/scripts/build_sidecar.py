@@ -139,6 +139,8 @@ def main() -> int:
         str(BASE_DIR),
         "--add-data",
         f"{BASE_DIR / 'static'}:static",
+        "--hidden-import",
+        "persistence",
     ]
 
     for module_name in COLLECT_ALL_CANDIDATES:
