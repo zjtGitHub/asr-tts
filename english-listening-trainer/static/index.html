@@ -7,6 +7,7 @@
   <style>
     :root { font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; color: #16181d; background: #f5f7fb; }
     * { box-sizing: border-box; }
+    html { scroll-padding-top: 170px; }
     body { margin: 0; }
     .page { max-width: 980px; margin: 0 auto; padding: 40px 20px 64px; }
     .card { background: #fff; border: 1px solid #e6e9ef; border-radius: 18px; box-shadow: 0 12px 32px rgba(20, 30, 50, .06); }
@@ -16,21 +17,38 @@
     .upload { margin-top: 22px; display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
     input[type=file] { max-width: 100%; }
     button { border: 0; border-radius: 10px; padding: 10px 16px; cursor: pointer; font-weight: 650; background: #111827; color: white; }
+    button.secondary { background: #eef2f7; color: #253044; }
+    button.secondary.active { background: #dce8ff; color: #174ea6; }
     button:disabled { opacity: .45; cursor: not-allowed; }
-    .player-wrap { padding: 20px 24px; position: sticky; top: 12px; z-index: 3; margin-bottom: 20px; }
-    audio { width: 100%; }
-    .meta { margin-top: 10px; color: #737d8c; font-size: 14px; }
-    .transcript { overflow: hidden; }
+
+    /* Keep the player available, but make the transcript its own scroll area so rows do not disappear underneath it. */
+    .player-wrap { padding: 18px 22px; position: sticky; top: 12px; z-index: 10; margin-bottom: 16px; background: rgba(255, 255, 255, .98); backdrop-filter: blur(10px); }
+    audio { width: 100%; display: block; }
+    .player-toolbar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-top: 10px; }
+    .player-toolbar button { padding: 8px 12px; font-size: 13px; }
+    .meta { margin-left: auto; color: #737d8c; font-size: 13px; min-width: 180px; text-align: right; }
+
+    .transcript { overflow-y: auto; max-height: calc(100vh - 190px); min-height: 260px; overscroll-behavior: contain; scroll-behavior: smooth; position: relative; }
     .empty { padding: 42px 28px; text-align: center; color: #7c8797; }
-    .segment { display: grid; grid-template-columns: 86px 1fr; gap: 12px; padding: 17px 22px; border-top: 1px solid #eef1f5; cursor: pointer; transition: background .15s ease; }
+    .segment { display: grid; grid-template-columns: 86px 1fr; gap: 12px; padding: 17px 22px; border-top: 1px solid #eef1f5; cursor: pointer; transition: background .15s ease, box-shadow .15s ease; scroll-margin-block: 120px; }
     .segment:first-child { border-top: 0; }
     .segment:hover { background: #f8fafc; }
-    .segment.active { background: #eef4ff; }
+    .segment.active { background: #eaf2ff; box-shadow: inset 4px 0 0 #2563eb; }
     .time { font-variant-numeric: tabular-nums; color: #526173; font-size: 13px; padding-top: 4px; }
     .text { font-size: 18px; line-height: 1.6; }
+    .transcript.subtitles-hidden .text { visibility: hidden; }
+    .hidden-hint { display: none; position: sticky; top: 0; z-index: 2; padding: 9px 14px; background: #fff8dd; color: #715b13; border-bottom: 1px solid #f1df9e; font-size: 13px; text-align: center; }
+    .transcript.subtitles-hidden .hidden-hint { display: block; }
     .status { margin-top: 12px; min-height: 22px; color: #5e6978; }
     .error { color: #b42318; }
-    @media (max-width: 640px) { .segment { grid-template-columns: 1fr; } .time { padding-top: 0; } }
+
+    @media (max-width: 640px) {
+      .page { padding-left: 10px; padding-right: 10px; }
+      .segment { grid-template-columns: 1fr; }
+      .time { padding-top: 0; }
+      .meta { width: 100%; margin-left: 0; text-align: left; }
+      .transcript { max-height: calc(100vh - 230px); }
+    }
   </style>
 </head>
 <body>
@@ -47,10 +65,16 @@
 
     <section id="playerCard" class="card player-wrap" hidden>
       <audio id="audio" controls preload="metadata"></audio>
-      <div id="meta" class="meta"></div>
+      <div class="player-toolbar">
+        <button id="locateBtn" class="secondary" type="button" disabled>⌖ Locate current</button>
+        <button id="followBtn" class="secondary active" type="button" disabled>✓ Auto follow</button>
+        <button id="subtitleBtn" class="secondary" type="button" disabled>Hide subtitles</button>
+        <div id="meta" class="meta"></div>
+      </div>
     </section>
 
-    <section class="card transcript">
+    <section id="transcriptCard" class="card transcript">
+      <div id="hiddenHint" class="hidden-hint">Subtitles are hidden. Click “Show subtitles” to reveal them.</div>
       <div id="empty" class="empty">Choose an audio file to begin.</div>
       <div id="segments"></div>
     </section>
@@ -63,11 +87,18 @@
     const audio = document.getElementById('audio');
     const playerCard = document.getElementById('playerCard');
     const metaEl = document.getElementById('meta');
+    const transcriptCard = document.getElementById('transcriptCard');
     const segmentsEl = document.getElementById('segments');
     const emptyEl = document.getElementById('empty');
+    const locateBtn = document.getElementById('locateBtn');
+    const followBtn = document.getElementById('followBtn');
+    const subtitleBtn = document.getElementById('subtitleBtn');
 
     let currentFileUrl = null;
     let segments = [];
+    let activeIndex = -1;
+    let autoFollow = true;
+    let subtitlesHidden = false;
 
     const formatTime = (value) => {
       const total = Math.max(0, Number(value) || 0);
@@ -81,9 +112,55 @@
       statusEl.className = isError ? 'status error' : 'status';
     }
 
+    function setControlsEnabled(enabled) {
+      locateBtn.disabled = !enabled;
+      followBtn.disabled = !enabled;
+      subtitleBtn.disabled = !enabled;
+    }
+
+    function findCurrentSegmentIndex() {
+      if (!segments.length) return -1;
+      const current = audio.currentTime;
+
+      // Prefer a segment that actually contains the current playback time.
+      for (let i = 0; i < segments.length; i += 1) {
+        if (current >= segments[i].start && current < segments[i].end) return i;
+      }
+
+      // During a short silence, keep the most recently spoken sentence selected.
+      let previous = -1;
+      for (let i = 0; i < segments.length; i += 1) {
+        if (segments[i].start <= current) previous = i;
+        else break;
+      }
+      return previous >= 0 ? previous : 0;
+    }
+
+    function scrollSegmentIntoView(index, behavior = 'smooth') {
+      const row = segmentsEl.querySelector(`.segment[data-index="${index}"]`);
+      if (!row) return;
+
+      const containerRect = transcriptCard.getBoundingClientRect();
+      const rowRect = row.getBoundingClientRect();
+      const relativeTop = rowRect.top - containerRect.top + transcriptCard.scrollTop;
+      const targetTop = relativeTop - (transcriptCard.clientHeight - rowRect.height) / 2;
+      transcriptCard.scrollTo({ top: Math.max(0, targetTop), behavior });
+    }
+
+    function setActiveSegment(index, shouldScroll = false) {
+      if (index === activeIndex && !shouldScroll) return;
+      activeIndex = index;
+      segmentsEl.querySelectorAll('.segment').forEach((node, nodeIndex) => {
+        node.classList.toggle('active', nodeIndex === index);
+      });
+      if (index >= 0 && shouldScroll) scrollSegmentIntoView(index);
+    }
+
     function renderSegments() {
       segmentsEl.innerHTML = '';
       emptyEl.hidden = segments.length > 0;
+      activeIndex = -1;
+
       segments.forEach((segment, index) => {
         const row = document.createElement('div');
         row.className = 'segment';
@@ -95,32 +172,65 @@
         row.querySelector('.text').textContent = segment.text;
         row.addEventListener('click', async () => {
           audio.currentTime = segment.start;
+          setActiveSegment(index, true);
           try { await audio.play(); } catch (_) {}
         });
         segmentsEl.appendChild(row);
       });
+
+      setControlsEnabled(segments.length > 0);
     }
 
     function updateActiveSegment() {
-      const current = audio.currentTime;
-      let activeIndex = -1;
-      for (let i = 0; i < segments.length; i += 1) {
-        if (current >= segments[i].start && current < segments[i].end) {
-          activeIndex = i;
-          break;
-        }
+      const nextIndex = findCurrentSegmentIndex();
+      if (nextIndex !== activeIndex) {
+        setActiveSegment(nextIndex, autoFollow);
       }
-      document.querySelectorAll('.segment').forEach((node, index) => {
-        node.classList.toggle('active', index === activeIndex);
-      });
     }
+
+    function updateFollowButton() {
+      followBtn.classList.toggle('active', autoFollow);
+      followBtn.textContent = autoFollow ? '✓ Auto follow' : 'Auto follow off';
+    }
+
+    function updateSubtitleButton() {
+      transcriptCard.classList.toggle('subtitles-hidden', subtitlesHidden);
+      subtitleBtn.classList.toggle('active', subtitlesHidden);
+      subtitleBtn.textContent = subtitlesHidden ? 'Show subtitles' : 'Hide subtitles';
+    }
+
+    locateBtn.addEventListener('click', () => {
+      const index = findCurrentSegmentIndex();
+      if (index < 0) return;
+      setActiveSegment(index, true);
+    });
+
+    followBtn.addEventListener('click', () => {
+      autoFollow = !autoFollow;
+      updateFollowButton();
+      if (autoFollow) {
+        const index = findCurrentSegmentIndex();
+        setActiveSegment(index, true);
+      }
+    });
+
+    subtitleBtn.addEventListener('click', () => {
+      subtitlesHidden = !subtitlesHidden;
+      updateSubtitleButton();
+    });
 
     fileInput.addEventListener('change', () => {
       const file = fileInput.files?.[0];
       transcribeBtn.disabled = !file;
       segments = [];
+      autoFollow = true;
+      subtitlesHidden = false;
       renderSegments();
+      updateFollowButton();
+      updateSubtitleButton();
       setStatus('');
+      transcriptCard.scrollTop = 0;
+
       if (currentFileUrl) URL.revokeObjectURL(currentFileUrl);
       if (file) {
         currentFileUrl = URL.createObjectURL(file);
@@ -139,6 +249,7 @@
       const formData = new FormData();
       formData.append('file', file);
       transcribeBtn.disabled = true;
+      setControlsEnabled(false);
       setStatus('Transcribing… the first run may download the Whisper model.');
 
       try {
@@ -149,7 +260,8 @@
         segments = payload.segments || [];
         renderSegments();
         metaEl.textContent = `${payload.filename} · ${formatTime(payload.duration)} · ${payload.language.toUpperCase()} ${(payload.language_probability * 100).toFixed(1)}%`;
-        setStatus(`Done. ${segments.length} timestamped segments generated.`);
+        setStatus(`Done. ${segments.length} timestamped sentences generated.`);
+        updateActiveSegment();
       } catch (error) {
         setStatus(error.message || String(error), true);
       } finally {
@@ -158,6 +270,21 @@
     });
 
     audio.addEventListener('timeupdate', updateActiveSegment);
+    audio.addEventListener('seeking', updateActiveSegment);
+    audio.addEventListener('play', updateActiveSegment);
+
+    // Handy keyboard controls while doing intensive listening.
+    document.addEventListener('keydown', (event) => {
+      if (event.target instanceof HTMLInputElement || event.target instanceof HTMLTextAreaElement) return;
+      if (event.key.toLowerCase() === 'l' && segments.length) {
+        event.preventDefault();
+        locateBtn.click();
+      }
+      if (event.key.toLowerCase() === 'h' && segments.length) {
+        event.preventDefault();
+        subtitleBtn.click();
+      }
+    });
   </script>
 </body>
 </html>
