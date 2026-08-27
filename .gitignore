@@ -1,5 +1,11 @@
 node_modules/
 vendor/
 english-listening-trainer/.venv/
+english-listening-trainer/.build/
 english-listening-trainer/src-tauri/target/
+english-listening-trainer/src-tauri/binaries/
+english-listening-trainer/src-tauri/icons/32x32.png
+english-listening-trainer/src-tauri/icons/128x128.png
+english-listening-trainer/src-tauri/icons/128x128@2x.png
+english-listening-trainer/src-tauri/icons/icon.icns
 .DS_Store
