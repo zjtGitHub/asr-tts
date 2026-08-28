@@ -1,0 +1,687 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>English Listening Trainer</title>
+  <style>
+    :root { font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; color: #16181d; background: #f5f7fb; }
+    * { box-sizing: border-box; }
+    html { scroll-padding-top: 170px; }
+    body { margin: 0; }
+    .page { max-width: 980px; margin: 0 auto; padding: 32px 20px 64px; }
+    .card { background: #fff; border: 1px solid #e6e9ef; border-radius: 18px; box-shadow: 0 12px 32px rgba(20, 30, 50, .06); }
+    .hero { padding: 26px 28px; margin-bottom: 16px; }
+    h1 { margin: 0 0 8px; font-size: 30px; }
+    h2 { margin: 0; font-size: 17px; }
+    .sub { margin: 0; color: #657080; line-height: 1.6; }
+    .upload { margin-top: 20px; display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+    input[type=file] { max-width: 100%; }
+    button { border: 0; border-radius: 10px; padding: 10px 16px; cursor: pointer; font-weight: 650; background: #111827; color: white; }
+    button.secondary { background: #eef2f7; color: #253044; }
+    button.secondary.active { background: #dce8ff; color: #174ea6; }
+    button.danger { background: #fff0ef; color: #b42318; }
+    button:disabled { opacity: .45; cursor: not-allowed; }
+    .continue-card { margin-bottom: 16px; padding: 18px 20px; display: grid; grid-template-columns: 1fr auto; gap: 18px; align-items: center; }
+    .continue-eyebrow { color: #2563eb; font-size: 12px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
+    .continue-title { margin-top: 5px; font-size: 20px; font-weight: 760; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .continue-meta { margin-top: 4px; color: #758090; font-size: 13px; }
+    .continue-action { min-width: 146px; }
+    .library { margin-bottom: 16px; padding: 18px 20px; }
+    .library-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
+    .library-count { color: #7b8491; font-size: 13px; }
+    .recent-list { display: grid; gap: 10px; }
+    .recent-empty { color: #7c8797; padding: 10px 2px 2px; font-size: 14px; }
+    .recent-item { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 12px; align-items: center; padding: 12px 14px; border: 1px solid #e8ebf0; border-radius: 12px; background: #fafbfc; }
+    .recent-item.active { border-color: #b7cef8; background: #eef5ff; }
+    .recent-main { width: 100%; min-width: 0; padding: 0; text-align: left; background: transparent; color: #18202c; border-radius: 8px; }
+    .recent-main:hover .recent-title { color: #174ea6; }
+    .recent-title { display: block; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .recent-meta { display: block; margin-top: 4px; color: #758090; font-size: 12px; font-weight: 500; }
+    .recent-progress-row { display: flex; align-items: center; gap: 10px; margin-top: 9px; }
+    .recent-progress { font-variant-numeric: tabular-nums; color: #4e5d70; font-size: 12px; white-space: nowrap; }
+    .progress-track { height: 6px; flex: 1; min-width: 80px; overflow: hidden; border-radius: 999px; background: #e5e9ef; }
+    .progress-fill { height: 100%; border-radius: inherit; background: #2563eb; transition: width .2s ease; }
+    .recent-actions { display: flex; gap: 7px; }
+    .recent-actions button { padding: 7px 10px; font-size: 12px; }
+    .player-wrap { padding: 18px 22px; position: sticky; top: 12px; z-index: 10; margin-bottom: 16px; background: rgba(255, 255, 255, .98); backdrop-filter: blur(10px); }
+    audio { width: 100%; display: block; }
+    .player-toolbar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-top: 10px; }
+    .player-toolbar button { padding: 8px 12px; font-size: 13px; }
+    .meta { margin-left: auto; color: #737d8c; font-size: 13px; min-width: 180px; text-align: right; }
+    .transcript { overflow-y: auto; max-height: calc(100vh - 190px); min-height: 260px; overscroll-behavior: contain; scroll-behavior: smooth; position: relative; }
+    .empty { padding: 42px 28px; text-align: center; color: #7c8797; }
+    .segment { display: grid; grid-template-columns: 86px 1fr; gap: 12px; padding: 17px 22px; border-top: 1px solid #eef1f5; cursor: pointer; transition: background .15s ease, box-shadow .15s ease; scroll-margin-block: 120px; }
+    .segment:first-child { border-top: 0; }
+    .segment:hover { background: #f8fafc; }
+    .segment.active { background: #eaf2ff; box-shadow: inset 4px 0 0 #2563eb; }
+    .time { font-variant-numeric: tabular-nums; color: #526173; font-size: 13px; padding-top: 4px; }
+    .text { font-size: 18px; line-height: 1.6; }
+    .transcript.subtitles-hidden .text { visibility: hidden; }
+    .hidden-hint { display: none; position: sticky; top: 0; z-index: 2; padding: 9px 14px; background: #fff8dd; color: #715b13; border-bottom: 1px solid #f1df9e; font-size: 13px; text-align: center; }
+    .transcript.subtitles-hidden .hidden-hint { display: block; }
+    .status { margin-top: 12px; min-height: 22px; color: #5e6978; }
+    .error { color: #b42318; }
+    .modal-backdrop { position: fixed; inset: 0; z-index: 1000; display: flex; align-items: center; justify-content: center; padding: 24px; background: rgba(15, 23, 42, .38); backdrop-filter: blur(3px); }
+    .modal-backdrop[hidden] { display: none; }
+    .modal-card { width: min(460px, 100%); padding: 22px; border-radius: 16px; background: white; box-shadow: 0 24px 80px rgba(15, 23, 42, .28); }
+    .modal-title { margin: 0; font-size: 19px; }
+    .modal-message { margin: 8px 0 0; color: #667085; font-size: 14px; line-height: 1.55; white-space: pre-line; }
+    .modal-input { width: 100%; margin-top: 16px; padding: 11px 12px; border: 1px solid #ccd3dd; border-radius: 10px; outline: none; font: inherit; color: #18202c; background: white; }
+    .modal-input:focus { border-color: #7aa7f7; box-shadow: 0 0 0 3px rgba(37, 99, 235, .12); }
+    .modal-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 18px; }
+    .modal-actions .danger { background: #b42318; color: white; }
+    @media (max-width: 700px) {
+      .page { padding-left: 10px; padding-right: 10px; }
+      .continue-card { grid-template-columns: 1fr; }
+      .continue-action { width: 100%; }
+      .recent-item { grid-template-columns: 1fr; }
+      .recent-actions { justify-content: flex-end; }
+      .segment { grid-template-columns: 1fr; }
+      .time { padding-top: 0; }
+      .meta { width: 100%; margin-left: 0; text-align: left; }
+      .transcript { max-height: calc(100vh - 230px); }
+    }
+  </style>
+</head>
+<body>
+  <main class="page">
+    <section class="card hero">
+      <h1>English Listening Trainer</h1>
+      <p class="sub">Import an English audio lesson once. Its media, transcript and listening position stay on this Mac so you can continue later without running Whisper again.</p>
+      <div class="upload">
+        <input id="fileInput" type="file" accept="audio/*,.mp3,.wav,.m4a,.aac,.flac,.ogg" />
+        <button id="transcribeBtn" disabled>Import & transcribe</button>
+      </div>
+      <div id="status" class="status"></div>
+    </section>
+
+    <section id="continueCard" class="card continue-card" hidden>
+      <div>
+        <div class="continue-eyebrow">Continue learning</div>
+        <div id="continueTitle" class="continue-title"></div>
+        <div id="continueMeta" class="continue-meta"></div>
+        <div class="recent-progress-row">
+          <div class="progress-track"><div id="continueProgressFill" class="progress-fill" style="width:0%"></div></div>
+          <span id="continueProgressText" class="recent-progress"></span>
+        </div>
+      </div>
+      <button id="continueBtn" class="continue-action" type="button">Continue lesson</button>
+    </section>
+
+    <section class="card library">
+      <div class="library-head">
+        <h2>Recent lessons</h2>
+        <span id="libraryCount" class="library-count"></span>
+      </div>
+      <div id="recentList" class="recent-list">
+        <div class="recent-empty">Loading your local library…</div>
+      </div>
+    </section>
+
+    <section id="playerCard" class="card player-wrap" hidden>
+      <audio id="audio" controls preload="metadata"></audio>
+      <div class="player-toolbar">
+        <button id="locateBtn" class="secondary" type="button" disabled>⌖ Locate current</button>
+        <button id="followBtn" class="secondary active" type="button" disabled>✓ Auto follow</button>
+        <button id="subtitleBtn" class="secondary" type="button" disabled>Hide subtitles</button>
+        <div id="meta" class="meta"></div>
+      </div>
+    </section>
+
+    <section id="transcriptCard" class="card transcript">
+      <div id="hiddenHint" class="hidden-hint">Subtitles are hidden. Click “Show subtitles” to reveal them.</div>
+      <div id="empty" class="empty">Import a lesson or open one from Recent lessons.</div>
+      <div id="segments"></div>
+    </section>
+  </main>
+
+  <div id="modalBackdrop" class="modal-backdrop" hidden>
+    <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+      <h3 id="modalTitle" class="modal-title"></h3>
+      <p id="modalMessage" class="modal-message"></p>
+      <input id="modalInput" class="modal-input" type="text" maxlength="200" hidden />
+      <div class="modal-actions">
+        <button id="modalCancelBtn" class="secondary" type="button">Cancel</button>
+        <button id="modalConfirmBtn" type="button">Save</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const fileInput = document.getElementById('fileInput');
+    const transcribeBtn = document.getElementById('transcribeBtn');
+    const statusEl = document.getElementById('status');
+    const audio = document.getElementById('audio');
+    const playerCard = document.getElementById('playerCard');
+    const metaEl = document.getElementById('meta');
+    const transcriptCard = document.getElementById('transcriptCard');
+    const segmentsEl = document.getElementById('segments');
+    const emptyEl = document.getElementById('empty');
+    const locateBtn = document.getElementById('locateBtn');
+    const followBtn = document.getElementById('followBtn');
+    const subtitleBtn = document.getElementById('subtitleBtn');
+    const recentList = document.getElementById('recentList');
+    const libraryCount = document.getElementById('libraryCount');
+    const continueCard = document.getElementById('continueCard');
+    const continueTitle = document.getElementById('continueTitle');
+    const continueMeta = document.getElementById('continueMeta');
+    const continueProgressFill = document.getElementById('continueProgressFill');
+    const continueProgressText = document.getElementById('continueProgressText');
+    const continueBtn = document.getElementById('continueBtn');
+    const modalBackdrop = document.getElementById('modalBackdrop');
+    const modalTitle = document.getElementById('modalTitle');
+    const modalMessage = document.getElementById('modalMessage');
+    const modalInput = document.getElementById('modalInput');
+    const modalCancelBtn = document.getElementById('modalCancelBtn');
+    const modalConfirmBtn = document.getElementById('modalConfirmBtn');
+
+    const isBackendHttpOrigin =
+      window.location.protocol === 'http:' &&
+      (window.location.hostname === '127.0.0.1' || window.location.hostname === 'localhost');
+    const API_BASE = isBackendHttpOrigin ? '' : 'http://127.0.0.1:8000';
+
+    let segments = [];
+    let activeIndex = -1;
+    let autoFollow = true;
+    let subtitlesHidden = false;
+    let currentProjectId = null;
+    let currentProject = null;
+    let progressTimer = null;
+    let lastProgressSentAt = 0;
+    let recentProjects = [];
+    let modalResolver = null;
+
+    const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+    const formatTime = (value) => {
+      const total = Math.max(0, Number(value) || 0);
+      const hours = Math.floor(total / 3600);
+      const minutes = Math.floor((total % 3600) / 60);
+      const seconds = Math.floor(total % 60);
+      return hours > 0
+        ? `${hours}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`
+        : `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+    };
+
+    const progressPercent = (position, duration) => {
+      const safeDuration = Math.max(0, Number(duration) || 0);
+      if (!safeDuration) return 0;
+      return Math.max(0, Math.min(100, ((Number(position) || 0) / safeDuration) * 100));
+    };
+
+    const formatLastStudied = (value) => {
+      if (!value) return 'Unknown';
+      const date = new Date(value);
+      if (Number.isNaN(date.getTime())) return 'Unknown';
+      const seconds = Math.round((date.getTime() - Date.now()) / 1000);
+      const absolute = Math.abs(seconds);
+      const relative = new Intl.RelativeTimeFormat([], { numeric: 'auto' });
+      if (absolute < 60) return 'just now';
+      if (absolute < 3600) return relative.format(Math.round(seconds / 60), 'minute');
+      if (absolute < 86400) return relative.format(Math.round(seconds / 3600), 'hour');
+      if (absolute < 604800) return relative.format(Math.round(seconds / 86400), 'day');
+      return date.toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+    };
+
+    function setStatus(message, isError = false) {
+      statusEl.textContent = message;
+      statusEl.className = isError ? 'status error' : 'status';
+    }
+
+    function setControlsEnabled(enabled) {
+      locateBtn.disabled = !enabled;
+      followBtn.disabled = !enabled;
+      subtitleBtn.disabled = !enabled;
+    }
+
+    async function api(path, options = {}) {
+      const response = await fetch(`${API_BASE}${path}`, options);
+      let payload = null;
+      try { payload = await response.json(); } catch (_) {}
+      if (!response.ok) throw new Error(payload?.detail || `Request failed (${response.status})`);
+      return payload;
+    }
+
+    function closeModal(result = null) {
+      modalBackdrop.hidden = true;
+      const resolve = modalResolver;
+      modalResolver = null;
+      if (resolve) resolve(result);
+    }
+
+    function showModal({ title, message = '', inputValue = null, confirmLabel = 'OK', danger = false }) {
+      if (modalResolver) closeModal(null);
+      modalTitle.textContent = title;
+      modalMessage.textContent = message;
+      modalMessage.hidden = !message;
+      modalConfirmBtn.textContent = confirmLabel;
+      modalConfirmBtn.classList.toggle('danger', danger);
+      const hasInput = inputValue !== null;
+      modalInput.hidden = !hasInput;
+      modalInput.value = hasInput ? inputValue : '';
+      modalBackdrop.hidden = false;
+      const promise = new Promise((resolve) => { modalResolver = resolve; });
+      requestAnimationFrame(() => {
+        if (hasInput) {
+          modalInput.focus();
+          modalInput.select();
+        } else {
+          modalCancelBtn.focus();
+        }
+      });
+      return promise;
+    }
+
+    modalCancelBtn.addEventListener('click', () => closeModal(null));
+    modalConfirmBtn.addEventListener('click', () => {
+      closeModal(modalInput.hidden ? true : modalInput.value);
+    });
+    modalBackdrop.addEventListener('click', (event) => {
+      if (event.target === modalBackdrop) closeModal(null);
+    });
+    modalInput.addEventListener('keydown', (event) => {
+      if (event.key === 'Enter') {
+        event.preventDefault();
+        modalConfirmBtn.click();
+      }
+    });
+
+    function findCurrentSegmentIndex() {
+      if (!segments.length) return -1;
+      const current = audio.currentTime;
+      for (let i = 0; i < segments.length; i += 1) {
+        if (current >= segments[i].start && current < segments[i].end) return i;
+      }
+      let previous = -1;
+      for (let i = 0; i < segments.length; i += 1) {
+        if (segments[i].start <= current) previous = i;
+        else break;
+      }
+      return previous >= 0 ? previous : 0;
+    }
+
+    function scrollSegmentIntoView(index, behavior = 'smooth') {
+      const row = segmentsEl.querySelector(`.segment[data-index="${index}"]`);
+      if (!row) return;
+      const containerRect = transcriptCard.getBoundingClientRect();
+      const rowRect = row.getBoundingClientRect();
+      const relativeTop = rowRect.top - containerRect.top + transcriptCard.scrollTop;
+      const targetTop = relativeTop - (transcriptCard.clientHeight - rowRect.height) / 2;
+      transcriptCard.scrollTo({ top: Math.max(0, targetTop), behavior });
+    }
+
+    function setActiveSegment(index, shouldScroll = false) {
+      if (index === activeIndex && !shouldScroll) return;
+      activeIndex = index;
+      segmentsEl.querySelectorAll('.segment').forEach((node, nodeIndex) => {
+        node.classList.toggle('active', nodeIndex === index);
+      });
+      if (index >= 0 && shouldScroll) scrollSegmentIntoView(index);
+    }
+
+    function renderSegments() {
+      segmentsEl.innerHTML = '';
+      emptyEl.hidden = segments.length > 0;
+      activeIndex = -1;
+      segments.forEach((segment, index) => {
+        const row = document.createElement('div');
+        row.className = 'segment';
+        row.dataset.index = index;
+        row.innerHTML = `
+          <div class="time">${formatTime(segment.start)} → ${formatTime(segment.end)}</div>
+          <div class="text"></div>
+        `;
+        row.querySelector('.text').textContent = segment.text;
+        row.addEventListener('click', async () => {
+          audio.currentTime = segment.start;
+          setActiveSegment(index, true);
+          scheduleProgressSave(true);
+          try { await audio.play(); } catch (_) {}
+        });
+        segmentsEl.appendChild(row);
+      });
+      setControlsEnabled(segments.length > 0);
+    }
+
+    function updateActiveSegment() {
+      const nextIndex = findCurrentSegmentIndex();
+      if (nextIndex !== activeIndex) setActiveSegment(nextIndex, autoFollow);
+    }
+
+    function updateFollowButton() {
+      followBtn.classList.toggle('active', autoFollow);
+      followBtn.textContent = autoFollow ? '✓ Auto follow' : 'Auto follow off';
+    }
+
+    function updateSubtitleButton() {
+      transcriptCard.classList.toggle('subtitles-hidden', subtitlesHidden);
+      subtitleBtn.classList.toggle('active', subtitlesHidden);
+      subtitleBtn.textContent = subtitlesHidden ? 'Show subtitles' : 'Hide subtitles';
+    }
+
+    function renderContinueLearning() {
+      const project = recentProjects[0];
+      if (!project) {
+        continueCard.hidden = true;
+        continueBtn.onclick = null;
+        return;
+      }
+      const percent = progressPercent(project.playback_position, project.duration);
+      continueCard.hidden = false;
+      continueTitle.textContent = project.title;
+      continueMeta.textContent = `Last studied ${formatLastStudied(project.last_opened_at)} · ${project.sentence_count} sentences`;
+      continueProgressFill.style.width = `${percent}%`;
+      continueProgressText.textContent = `${formatTime(project.playback_position)} / ${formatTime(project.duration)}`;
+      continueBtn.onclick = () => openProject(project.id);
+    }
+
+    function createRecentItem(project) {
+      const item = document.createElement('div');
+      item.className = `recent-item${project.id === currentProjectId ? ' active' : ''}`;
+      item.dataset.projectId = project.id;
+
+      const main = document.createElement('button');
+      main.type = 'button';
+      main.className = 'recent-main';
+      main.innerHTML = `
+        <span class="recent-title"></span>
+        <span class="recent-meta"></span>
+        <span class="recent-progress-row">
+          <span class="progress-track"><span class="progress-fill"></span></span>
+          <span class="recent-progress"></span>
+        </span>
+      `;
+      main.querySelector('.recent-title').textContent = project.title;
+      main.querySelector('.recent-meta').textContent = `Last studied ${formatLastStudied(project.last_opened_at)} · ${project.sentence_count} sentences`;
+      main.querySelector('.progress-fill').style.width = `${progressPercent(project.playback_position, project.duration)}%`;
+      main.querySelector('.recent-progress').textContent = `${formatTime(project.playback_position)} / ${formatTime(project.duration)}`;
+      main.addEventListener('click', () => openProject(project.id));
+
+      const actions = document.createElement('div');
+      actions.className = 'recent-actions';
+
+      const renameButton = document.createElement('button');
+      renameButton.type = 'button';
+      renameButton.className = 'secondary';
+      renameButton.textContent = 'Rename';
+      renameButton.addEventListener('click', () => renameLesson(project));
+
+      const deleteButton = document.createElement('button');
+      deleteButton.type = 'button';
+      deleteButton.className = 'danger';
+      deleteButton.textContent = 'Delete';
+      deleteButton.addEventListener('click', () => deleteLesson(project));
+
+      actions.append(renameButton, deleteButton);
+      item.append(main, actions);
+      return item;
+    }
+
+    async function loadRecentProjects() {
+      const payload = await api('/api/projects');
+      recentProjects = payload.projects || [];
+      libraryCount.textContent = recentProjects.length ? `${recentProjects.length} saved locally` : '';
+      recentList.innerHTML = '';
+      if (!recentProjects.length) {
+        recentList.innerHTML = '<div class="recent-empty">No saved lessons yet. Import your first audio above.</div>';
+      } else {
+        recentProjects.forEach((project) => recentList.appendChild(createRecentItem(project)));
+      }
+      renderContinueLearning();
+    }
+
+    function updateVisibleProgress() {
+      if (!currentProjectId || !currentProject) return;
+      const position = Number.isFinite(audio.currentTime) ? audio.currentTime : 0;
+      const percent = progressPercent(position, currentProject.duration);
+      const item = recentList.querySelector(`[data-project-id="${currentProjectId}"]`);
+      if (item) {
+        const fill = item.querySelector('.progress-fill');
+        const text = item.querySelector('.recent-progress');
+        if (fill) fill.style.width = `${percent}%`;
+        if (text) text.textContent = `${formatTime(position)} / ${formatTime(currentProject.duration)}`;
+      }
+      if (recentProjects[0]?.id === currentProjectId) {
+        continueProgressFill.style.width = `${percent}%`;
+        continueProgressText.textContent = `${formatTime(position)} / ${formatTime(currentProject.duration)}`;
+      }
+    }
+
+    async function saveProgress() {
+      if (!currentProjectId) return;
+      lastProgressSentAt = Date.now();
+      try {
+        await api(`/api/projects/${currentProjectId}/progress`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            playback_position: Number.isFinite(audio.currentTime) ? audio.currentTime : 0,
+            playback_rate: audio.playbackRate || 1,
+            subtitles_hidden: subtitlesHidden,
+            auto_follow: autoFollow,
+          }),
+          keepalive: true,
+        });
+      } catch (error) {
+        console.warn('Could not persist listening progress', error);
+      }
+    }
+
+    function scheduleProgressSave(immediate = false) {
+      clearTimeout(progressTimer);
+      const elapsed = Date.now() - lastProgressSentAt;
+      const delayMs = immediate || elapsed >= 3000 ? 0 : 3000 - elapsed;
+      progressTimer = setTimeout(saveProgress, delayMs);
+    }
+
+    function resetWorkspace() {
+      clearTimeout(progressTimer);
+      currentProjectId = null;
+      currentProject = null;
+      segments = [];
+      activeIndex = -1;
+      autoFollow = true;
+      subtitlesHidden = false;
+      audio.pause();
+      audio.removeAttribute('src');
+      audio.load();
+      playerCard.hidden = true;
+      metaEl.textContent = '';
+      segmentsEl.innerHTML = '';
+      emptyEl.hidden = false;
+      emptyEl.textContent = 'Import a lesson or open one from Recent lessons.';
+      transcriptCard.scrollTop = 0;
+      updateFollowButton();
+      updateSubtitleButton();
+      setControlsEnabled(false);
+    }
+
+    async function openProject(projectId, providedProject = null) {
+      if (currentProjectId && currentProjectId !== projectId) await saveProgress();
+      try {
+        setStatus('Opening saved lesson…');
+        const project = providedProject || await api(`/api/projects/${projectId}`);
+        currentProjectId = project.id;
+        currentProject = project;
+        segments = project.segments || [];
+        autoFollow = project.auto_follow !== false;
+        subtitlesHidden = Boolean(project.subtitles_hidden);
+        renderSegments();
+        updateFollowButton();
+        updateSubtitleButton();
+        transcriptCard.scrollTop = 0;
+        playerCard.hidden = false;
+        metaEl.textContent = `${project.title} · ${formatTime(project.duration)} · ${String(project.language || 'en').toUpperCase()} ${(Number(project.language_probability || 0) * 100).toFixed(1)}%`;
+        audio.src = `${API_BASE}${project.media_url}`;
+        audio.playbackRate = Number(project.playback_rate) || 1;
+        const resumePosition = Math.min(Number(project.playback_position) || 0, Math.max(0, Number(project.duration) || 0));
+        const restore = () => {
+          audio.currentTime = resumePosition;
+          updateActiveSegment();
+          const index = findCurrentSegmentIndex();
+          if (index >= 0) setActiveSegment(index, true);
+          updateVisibleProgress();
+        };
+        if (audio.readyState >= 1) restore();
+        else audio.addEventListener('loadedmetadata', restore, { once: true });
+        setStatus(project.reused ? 'Already in your library. Opened the saved transcript without running Whisper again.' : 'Lesson opened. Your listening position will continue to be saved locally.');
+        await loadRecentProjects().catch((error) => console.warn('Could not refresh lesson list', error));
+      } catch (error) {
+        setStatus(error.message || String(error), true);
+      }
+    }
+
+    async function renameLesson(project) {
+      const nextTitle = await showModal({
+        title: 'Rename lesson',
+        message: 'Choose a name for this lesson. The original audio filename will not be changed.',
+        inputValue: project.title,
+        confirmLabel: 'Save',
+      });
+      if (nextTitle === null) return;
+      const title = String(nextTitle).trim();
+      if (!title) {
+        setStatus('Lesson title cannot be empty.', true);
+        return;
+      }
+      if (title === project.title) return;
+      try {
+        const updated = await api(`/api/projects/${project.id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ title }),
+        });
+        if (currentProjectId === project.id) {
+          currentProject = { ...currentProject, ...updated };
+          metaEl.textContent = `${updated.title} · ${formatTime(updated.duration)} · ${String(updated.language || 'en').toUpperCase()} ${(Number(updated.language_probability || 0) * 100).toFixed(1)}%`;
+        }
+        setStatus(`Renamed lesson to “${updated.title}”.`);
+        await loadRecentProjects();
+      } catch (error) {
+        setStatus(error.message || String(error), true);
+      }
+    }
+
+    async function deleteLesson(project) {
+      const confirmed = await showModal({
+        title: `Delete “${project.title}”?`,
+        message: "This permanently removes the saved transcript and the app's local media copy. Your original source file is not affected.",
+        confirmLabel: 'Delete lesson',
+        danger: true,
+      });
+      if (!confirmed) return;
+      const deletingCurrent = currentProjectId === project.id;
+      if (deletingCurrent) {
+        clearTimeout(progressTimer);
+        currentProjectId = null;
+      }
+      try {
+        await api(`/api/projects/${project.id}`, { method: 'DELETE' });
+        if (deletingCurrent) resetWorkspace();
+        setStatus(`Deleted “${project.title}”.`);
+        await loadRecentProjects();
+      } catch (error) {
+        if (deletingCurrent) currentProjectId = project.id;
+        setStatus(error.message || String(error), true);
+      }
+    }
+
+    locateBtn.addEventListener('click', () => {
+      const index = findCurrentSegmentIndex();
+      if (index >= 0) setActiveSegment(index, true);
+    });
+
+    followBtn.addEventListener('click', () => {
+      autoFollow = !autoFollow;
+      updateFollowButton();
+      if (autoFollow) {
+        const index = findCurrentSegmentIndex();
+        setActiveSegment(index, true);
+      }
+      scheduleProgressSave(true);
+    });
+
+    subtitleBtn.addEventListener('click', () => {
+      subtitlesHidden = !subtitlesHidden;
+      updateSubtitleButton();
+      scheduleProgressSave(true);
+    });
+
+    fileInput.addEventListener('change', () => {
+      transcribeBtn.disabled = !fileInput.files?.[0];
+      setStatus('');
+    });
+
+    transcribeBtn.addEventListener('click', async () => {
+      const file = fileInput.files?.[0];
+      if (!file) return;
+      const formData = new FormData();
+      formData.append('file', file);
+      transcribeBtn.disabled = true;
+      setControlsEnabled(false);
+      setStatus('Importing… existing audio is reused instantly; new audio will run Whisper once.');
+      try {
+        const project = await api('/api/transcribe', { method: 'POST', body: formData });
+        fileInput.value = '';
+        transcribeBtn.disabled = true;
+        await openProject(project.id, project);
+      } catch (error) {
+        setStatus(error.message || String(error), true);
+        setControlsEnabled(segments.length > 0);
+      } finally {
+        transcribeBtn.disabled = !fileInput.files?.[0];
+      }
+    });
+
+    audio.addEventListener('timeupdate', () => {
+      updateActiveSegment();
+      updateVisibleProgress();
+      scheduleProgressSave(false);
+    });
+    audio.addEventListener('pause', () => scheduleProgressSave(true));
+    audio.addEventListener('seeked', () => scheduleProgressSave(true));
+    audio.addEventListener('ratechange', () => scheduleProgressSave(true));
+    audio.addEventListener('ended', () => scheduleProgressSave(true));
+
+    window.addEventListener('pagehide', () => { saveProgress(); });
+
+    document.addEventListener('keydown', (event) => {
+      if (!modalBackdrop.hidden && event.key === 'Escape') {
+        event.preventDefault();
+        closeModal(null);
+        return;
+      }
+      if (event.target instanceof HTMLInputElement || event.target instanceof HTMLTextAreaElement) return;
+      if (event.key.toLowerCase() === 'l' && !locateBtn.disabled) {
+        event.preventDefault();
+        locateBtn.click();
+      }
+      if (event.key.toLowerCase() === 'h' && !subtitleBtn.disabled) {
+        event.preventDefault();
+        subtitleBtn.click();
+      }
+    });
+
+    async function bootstrapLibrary() {
+      for (let attempt = 0; attempt < 10; attempt += 1) {
+        try {
+          await loadRecentProjects();
+          return;
+        } catch (error) {
+          if (attempt === 9) {
+            recentList.innerHTML = `<div class="recent-empty">Could not load local lessons: ${error.message}</div>`;
+            setStatus('The local backend did not become ready in time.', true);
+            return;
+          }
+          await delay(400);
+        }
+      }
+    }
+
+    updateFollowButton();
+    updateSubtitleButton();
+    bootstrapLibrary();
+  </script>
+</body>
+</html>

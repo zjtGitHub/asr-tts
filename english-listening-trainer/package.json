@@ -1,0 +1,15 @@
+{
+  "name": "english-listening-trainer-desktop",
+  "private": true,
+  "version": "0.2.0",
+  "description": "Tauri desktop shell for English Listening Trainer",
+  "scripts": {
+    "tauri": "tauri",
+    "icons:prepare": "python3 scripts/prepare_icons.py",
+    "backend:build": "python3 scripts/build_sidecar.py",
+    "desktop:build": "npm run icons:prepare && npm run backend:build && tauri build --config src-tauri/tauri.release.conf.json"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2"
+  }
+}

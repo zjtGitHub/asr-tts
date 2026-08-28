@@ -1,0 +1,36 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "English Listening Trainer",
+  "version": "0.2.0",
+  "identifier": "com.zjt.english-listening-trainer",
+  "build": {
+    "beforeDevCommand": {
+      "cwd": "..",
+      "script": "python3 scripts/dev_backend.py",
+      "wait": false
+    },
+    "devUrl": "http://127.0.0.1:8001",
+    "frontendDist": "../static"
+  },
+  "app": {
+    "windows": [
+      {
+        "label": "main",
+        "title": "English Listening Trainer",
+        "width": 1100,
+        "height": 820,
+        "minWidth": 760,
+        "minHeight": 600,
+        "resizable": true,
+        "fullscreen": false
+      }
+    ],
+    "security": {
+      "csp": null
+    }
+  },
+  "bundle": {
+    "active": false,
+    "icon": []
+  }
+}
