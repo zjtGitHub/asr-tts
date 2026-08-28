@@ -9,12 +9,14 @@ from pathlib import Path
 
 BASE_DIR = Path(__file__).resolve().parents[1]
 PYTHON = BASE_DIR / ".venv" / "bin" / "python"
+DEV_PORT = os.getenv("ELT_DEV_PORT", "8001")
 
 
 def main() -> int:
     python_executable = PYTHON if PYTHON.exists() else Path(sys.executable)
     env = os.environ.copy()
     env.setdefault("PYTHONUNBUFFERED", "1")
+    env.setdefault("ELT_BACKEND_PORT", DEV_PORT)
 
     process = subprocess.Popen(
         [
@@ -25,7 +27,7 @@ def main() -> int:
             "--host",
             "127.0.0.1",
             "--port",
-            "8000",
+            DEV_PORT,
         ],
         cwd=BASE_DIR,
         env=env,
