@@ -24,6 +24,7 @@ from persistence import (
     init_database,
     list_projects,
     media_relative_path,
+    rename_project,
     update_project_progress,
 )
 
@@ -33,6 +34,7 @@ MODEL_SIZE = os.getenv("WHISPER_MODEL", "small")
 DEVICE = os.getenv("WHISPER_DEVICE", "cpu")
 COMPUTE_TYPE = os.getenv("WHISPER_COMPUTE_TYPE", "int8")
 SUPPORTED_AUDIO_SUFFIXES = {".mp3", ".wav", ".m4a", ".aac", ".flac", ".ogg"}
+MAX_LESSON_TITLE_LENGTH = 200
 
 app = FastAPI(title="English Listening Trainer")
 app.add_middleware(
@@ -139,6 +141,26 @@ def project_payload(project: dict[str, Any], *, reused: bool = False) -> dict[st
     }
 
 
+def validated_title(payload: dict[str, Any]) -> str:
+    title = str(payload.get("title", "")).strip()
+    if not title:
+        raise HTTPException(status_code=400, detail="Lesson title cannot be empty")
+    if len(title) > MAX_LESSON_TITLE_LENGTH:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Lesson title must be {MAX_LESSON_TITLE_LENGTH} characters or fewer",
+        )
+    return title
+
+
+def expected_project_media_directory(project_id: str, media_path: Path) -> Path:
+    expected = (MEDIA_DIR / project_id).resolve()
+    actual = media_path.parent.resolve()
+    if actual != expected:
+        raise HTTPException(status_code=500, detail="Stored lesson media path is invalid")
+    return actual
+
+
 @app.get("/")
 def index() -> FileResponse:
     return FileResponse(STATIC_DIR / "index.html")
@@ -160,6 +182,39 @@ def project(project_id: str) -> dict[str, Any]:
     if stored is None:
         raise HTTPException(status_code=404, detail="Lesson not found")
     return project_payload(stored)
+
+
+@app.patch("/api/projects/{project_id}")
+def update_project(project_id: str, payload: dict[str, Any] = Body(...)) -> dict[str, Any]:
+    title = validated_title(payload)
+    if not rename_project(project_id, title):
+        raise HTTPException(status_code=404, detail="Lesson not found")
+    stored = get_project(project_id, touch=False)
+    if stored is None:
+        raise HTTPException(status_code=404, detail="Lesson not found")
+    return project_payload(stored)
+
+
+@app.delete("/api/projects/{project_id}")
+def remove_project(project_id: str) -> dict[str, bool]:
+    media_path = get_project_media_path(project_id)
+    if media_path is None:
+        raise HTTPException(status_code=404, detail="Lesson not found")
+
+    project_directory = expected_project_media_directory(project_id, media_path)
+    if not delete_project(project_id):
+        raise HTTPException(status_code=404, detail="Lesson not found")
+
+    try:
+        if project_directory.exists():
+            shutil.rmtree(project_directory)
+    except OSError as exc:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Lesson record was deleted, but its local media could not be removed: {exc}",
+        ) from exc
+
+    return {"ok": True}
 
 
 @app.get("/api/projects/{project_id}/media")
@@ -210,6 +265,8 @@ async def transcribe(file: UploadFile = File(...)) -> dict[str, Any]:
                 if existing_media is not None and existing_media.is_file():
                     return project_payload(existing, reused=True)
                 delete_project(existing_project_id)
+                if existing_media is not None:
+                    shutil.rmtree(existing_media.parent, ignore_errors=True)
 
         project_id = uuid.uuid4().hex
         transcript_id = uuid.uuid4().hex
