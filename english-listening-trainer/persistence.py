@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import json
 import os
 import sqlite3
 from datetime import datetime, timezone
@@ -125,9 +124,20 @@ def find_project_id_by_hash(media_sha256: str) -> str | None:
     return str(row["id"]) if row else None
 
 
-def delete_project(project_id: str) -> None:
+def rename_project(project_id: str, title: str) -> bool:
+    timestamp = utc_now()
     with connect() as connection:
-        connection.execute("DELETE FROM projects WHERE id = ?", (project_id,))
+        cursor = connection.execute(
+            "UPDATE projects SET title = ?, updated_at = ? WHERE id = ?",
+            (title, timestamp, project_id),
+        )
+    return cursor.rowcount > 0
+
+
+def delete_project(project_id: str) -> bool:
+    with connect() as connection:
+        cursor = connection.execute("DELETE FROM projects WHERE id = ?", (project_id,))
+    return cursor.rowcount > 0
 
 
 def create_project(
