@@ -62,6 +62,15 @@
     .transcript.subtitles-hidden .hidden-hint { display: block; }
     .status { margin-top: 12px; min-height: 22px; color: #5e6978; }
     .error { color: #b42318; }
+    .modal-backdrop { position: fixed; inset: 0; z-index: 1000; display: flex; align-items: center; justify-content: center; padding: 24px; background: rgba(15, 23, 42, .38); backdrop-filter: blur(3px); }
+    .modal-backdrop[hidden] { display: none; }
+    .modal-card { width: min(460px, 100%); padding: 22px; border-radius: 16px; background: white; box-shadow: 0 24px 80px rgba(15, 23, 42, .28); }
+    .modal-title { margin: 0; font-size: 19px; }
+    .modal-message { margin: 8px 0 0; color: #667085; font-size: 14px; line-height: 1.55; white-space: pre-line; }
+    .modal-input { width: 100%; margin-top: 16px; padding: 11px 12px; border: 1px solid #ccd3dd; border-radius: 10px; outline: none; font: inherit; color: #18202c; background: white; }
+    .modal-input:focus { border-color: #7aa7f7; box-shadow: 0 0 0 3px rgba(37, 99, 235, .12); }
+    .modal-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 18px; }
+    .modal-actions .danger { background: #b42318; color: white; }
     @media (max-width: 700px) {
       .page { padding-left: 10px; padding-right: 10px; }
       .continue-card { grid-template-columns: 1fr; }
@@ -127,6 +136,18 @@
     </section>
   </main>
 
+  <div id="modalBackdrop" class="modal-backdrop" hidden>
+    <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+      <h3 id="modalTitle" class="modal-title"></h3>
+      <p id="modalMessage" class="modal-message"></p>
+      <input id="modalInput" class="modal-input" type="text" maxlength="200" hidden />
+      <div class="modal-actions">
+        <button id="modalCancelBtn" class="secondary" type="button">Cancel</button>
+        <button id="modalConfirmBtn" type="button">Save</button>
+      </div>
+    </div>
+  </div>
+
   <script>
     const fileInput = document.getElementById('fileInput');
     const transcribeBtn = document.getElementById('transcribeBtn');
@@ -148,6 +169,12 @@
     const continueProgressFill = document.getElementById('continueProgressFill');
     const continueProgressText = document.getElementById('continueProgressText');
     const continueBtn = document.getElementById('continueBtn');
+    const modalBackdrop = document.getElementById('modalBackdrop');
+    const modalTitle = document.getElementById('modalTitle');
+    const modalMessage = document.getElementById('modalMessage');
+    const modalInput = document.getElementById('modalInput');
+    const modalCancelBtn = document.getElementById('modalCancelBtn');
+    const modalConfirmBtn = document.getElementById('modalConfirmBtn');
 
     const isBackendHttpOrigin =
       window.location.protocol === 'http:' &&
@@ -163,6 +190,7 @@
     let progressTimer = null;
     let lastProgressSentAt = 0;
     let recentProjects = [];
+    let modalResolver = null;
 
     const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -214,6 +242,50 @@
       if (!response.ok) throw new Error(payload?.detail || `Request failed (${response.status})`);
       return payload;
     }
+
+    function closeModal(result = null) {
+      modalBackdrop.hidden = true;
+      const resolve = modalResolver;
+      modalResolver = null;
+      if (resolve) resolve(result);
+    }
+
+    function showModal({ title, message = '', inputValue = null, confirmLabel = 'OK', danger = false }) {
+      if (modalResolver) closeModal(null);
+      modalTitle.textContent = title;
+      modalMessage.textContent = message;
+      modalMessage.hidden = !message;
+      modalConfirmBtn.textContent = confirmLabel;
+      modalConfirmBtn.classList.toggle('danger', danger);
+      const hasInput = inputValue !== null;
+      modalInput.hidden = !hasInput;
+      modalInput.value = hasInput ? inputValue : '';
+      modalBackdrop.hidden = false;
+      const promise = new Promise((resolve) => { modalResolver = resolve; });
+      requestAnimationFrame(() => {
+        if (hasInput) {
+          modalInput.focus();
+          modalInput.select();
+        } else {
+          modalCancelBtn.focus();
+        }
+      });
+      return promise;
+    }
+
+    modalCancelBtn.addEventListener('click', () => closeModal(null));
+    modalConfirmBtn.addEventListener('click', () => {
+      closeModal(modalInput.hidden ? true : modalInput.value);
+    });
+    modalBackdrop.addEventListener('click', (event) => {
+      if (event.target === modalBackdrop) closeModal(null);
+    });
+    modalInput.addEventListener('keydown', (event) => {
+      if (event.key === 'Enter') {
+        event.preventDefault();
+        modalConfirmBtn.click();
+      }
+    });
 
     function findCurrentSegmentIndex() {
       if (!segments.length) return -1;
@@ -461,10 +533,19 @@
     }
 
     async function renameLesson(project) {
-      const nextTitle = window.prompt('Rename lesson', project.title);
+      const nextTitle = await showModal({
+        title: 'Rename lesson',
+        message: 'Choose a name for this lesson. The original audio filename will not be changed.',
+        inputValue: project.title,
+        confirmLabel: 'Save',
+      });
       if (nextTitle === null) return;
-      const title = nextTitle.trim();
-      if (!title || title === project.title) return;
+      const title = String(nextTitle).trim();
+      if (!title) {
+        setStatus('Lesson title cannot be empty.', true);
+        return;
+      }
+      if (title === project.title) return;
       try {
         const updated = await api(`/api/projects/${project.id}`, {
           method: 'PATCH',
@@ -483,7 +564,12 @@
     }
 
     async function deleteLesson(project) {
-      const confirmed = window.confirm(`Delete “${project.title}”?\n\nThis permanently removes the saved transcript and the app's local media copy. Your original source file is not affected.`);
+      const confirmed = await showModal({
+        title: `Delete “${project.title}”?`,
+        message: "This permanently removes the saved transcript and the app's local media copy. Your original source file is not affected.",
+        confirmLabel: 'Delete lesson',
+        danger: true,
+      });
       if (!confirmed) return;
       const deletingCurrent = currentProjectId === project.id;
       if (deletingCurrent) {
@@ -561,6 +647,11 @@
     window.addEventListener('pagehide', () => { saveProgress(); });
 
     document.addEventListener('keydown', (event) => {
+      if (!modalBackdrop.hidden && event.key === 'Escape') {
+        event.preventDefault();
+        closeModal(null);
+        return;
+      }
       if (event.target instanceof HTMLInputElement || event.target instanceof HTMLTextAreaElement) return;
       if (event.key.toLowerCase() === 'l' && !locateBtn.disabled) {
         event.preventDefault();
